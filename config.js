@@ -6,11 +6,11 @@
 const TELEGRAM_CONFIG = {
   // استبدل هذا بـ Token الخاص ببوتك على تلجرام
   // احصل عليه من BotFather: https://t.me/botfather
-  BOT_TOKEN: "YOUR_BOT_TOKEN_HERE",
+  BOT_TOKEN: "8642789421:AAH5WVNFF0yxI-OIRjtsMPuBw3cSawVF1pk",
   
   // استبدل هذا بـ Chat ID الخاص بك
   // يمكنك الحصول عليه من @userinfobot على تلجرام
-  CHAT_ID: "YOUR_CHAT_ID_HERE",
+  CHAT_ID: "8642789421",
   
   // رابط API تلجرام (لا تغيره عادة)
   API_URL: "https://api.telegram.org/bot"
@@ -20,8 +20,8 @@ const TELEGRAM_CONFIG = {
  * دالة للتحقق من صحة الإعدادات
  */
 function validateTelegramConfig() {
-  if (TELEGRAM_CONFIG.BOT_TOKEN === "YOUR_BOT_TOKEN_HERE" || 
-      TELEGRAM_CONFIG.CHAT_ID === "YOUR_CHAT_ID_HERE") {
+  if (TELEGRAM_CONFIG.BOT_TOKEN === "8642789421:AAH5WVNFF0yxI-OIRjtsMPuBw3cSawVF1pk" || 
+      TELEGRAM_CONFIG.CHAT_ID === "8642789421") {
     console.warn("⚠️ تحذير: يرجى تحديث إعدادات تلجرام في ملف config.js");
     return false;
   }
