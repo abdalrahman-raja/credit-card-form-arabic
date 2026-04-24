@@ -2,7 +2,6 @@
  * ملف إعدادات بوت تلجرام
  * يرجى تحديث البيانات التالية بقيمك الخاصة
  */
-
 const TELEGRAM_CONFIG = {
   // استبدل هذا بـ Token الخاص ببوتك على تلجرام
   // احصل عليه من BotFather: https://t.me/botfather
@@ -20,9 +19,9 @@ const TELEGRAM_CONFIG = {
  * دالة للتحقق من صحة الإعدادات
  */
 function validateTelegramConfig() {
-  if (TELEGRAM_CONFIG.BOT_TOKEN === "8642789421:AAH5WVNFF0yxI-OIRjtsMPuBw3cSawVF1pk" || 
-      TELEGRAM_CONFIG.CHAT_ID === "8642789421") {
-    console.warn("⚠️ تحذير: يرجى تحديث إعدادات تلجرام في ملف config.js");
+  // تم تعديل هذه الدالة للسماح بالقيم الحالية
+  if (!TELEGRAM_CONFIG.BOT_TOKEN || !TELEGRAM_CONFIG.CHAT_ID) {
+    console.warn("⚠️ تحذير: يرجى التأكد من وجود إعدادات تلجرام في ملف config.js");
     return false;
   }
   return true;
@@ -36,9 +35,8 @@ function validateTelegramConfig() {
  */
 function sendToTelegram(message, parseMode = 'HTML') {
   if (!validateTelegramConfig()) {
-    return Promise.reject(new Error("إعدادات تلجرام غير صحيحة"));
+    return Promise.reject(new Error("إعدادات تلجرام غير مكتملة"));
   }
-
   const url = `${TELEGRAM_CONFIG.API_URL}${TELEGRAM_CONFIG.BOT_TOKEN}/sendMessage`;
   
   return fetch(url, {
